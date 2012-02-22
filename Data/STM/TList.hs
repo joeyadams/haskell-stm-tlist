@@ -34,12 +34,20 @@ module Data.STM.TList (
     length,
     foldl',
     toList,
+
+    -- * Working with mutable cursors
+    TCursor,
+    newCursorPair,
+    newCursorPairIO,
+    read,
+    tryRead,
+    write,
 ) where
 
-import Prelude hiding (drop, length, null)
+import Prelude hiding (drop, length, null, read)
 
 import Control.Concurrent.STM hiding (check)
-import Control.Monad (foldM)
+import Control.Monad (liftM2, foldM)
 import Data.Typeable (Typeable)
 
 ------------------------------------------------------------------------
@@ -155,3 +163,51 @@ toList = loop id
         loop !dl =
             uncons (return $ dl [])
                    (loop . (dl .) . (:))
+
+------------------------------------------------------------------------
+-- Working with mutable cursors
+
+-- | A 'TCursor' is a mutable cursor used for traversing items.  While 'uncons'
+-- and 'append' return the subsequent 'TList', 'read' and 'write' modify the
+-- 'TCursor' in-place, and thus behave more like 'readTChan' and 'writeTChan'.
+type TCursor a = TVar (TList a)
+
+-- | /O(1)/.  Construct an empty channel, returning the read cursor ('fst') and
+-- write cursor ('snd').
+newCursorPair :: STM (TCursor a, TCursor a)
+newCursorPair = do
+    hole <- empty
+    liftM2 (,) (newTVar hole) (newTVar hole)
+
+-- | /O(1)/.  'IO' variant of 'newCursorPair'.  See 'newTVarIO' for the
+-- rationale.
+newCursorPairIO :: IO (TCursor a, TCursor a)
+newCursorPairIO = do
+    hole <- emptyIO
+    liftM2 (,) (newTVarIO hole) (newTVarIO hole)
+
+-- | /O(1)/.  Read the next item and advance the cursor.  'retry' if the list
+-- is currently empty.
+--
+-- This should be called on the read cursor of the channel.
+read :: TCursor a -> STM a
+read cursor =
+    readTVar cursor >>=
+        uncons retry
+               (\x xs -> do writeTVar cursor xs
+                            return x)
+
+-- | /O(1)/.  Like 'read', but return 'Nothing', rather than 'retry'ing, if the
+-- list is currently empty.
+tryRead :: TCursor a -> STM (Maybe a)
+tryRead cursor =
+    readTVar cursor >>=
+        uncons (return Nothing)
+               (\x xs -> do writeTVar cursor xs
+                            return (Just x))
+
+-- | /O(1)/.  Append an item and advance the cursor.  This should be called on
+-- the write cursor of the channel.  See 'append' for more details.
+write :: TCursor a -> a -> STM ()
+write cursor x =
+    readTVar cursor >>= flip append x >>= writeTVar cursor
