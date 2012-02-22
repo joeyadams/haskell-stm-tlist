@@ -56,6 +56,4 @@ unGetTChan TChan{..} x =
 
 isEmptyTChan :: TChan a -> STM Bool
 isEmptyTChan TChan{..} =
-    readTVar readEnd >>=
-        TList.uncons (return True)
-                     (\_ _ -> return False)
+    readTVar readEnd >>= TList.null

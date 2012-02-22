@@ -28,6 +28,7 @@ module Data.STM.TList (
     -- | These functions traverse the list strictly.  They examine the list as
     -- it is now; they do not 'retry' when the end of the list is reached.
     uncons,
+    null,
     drop,
     end,
     length,
@@ -35,8 +36,7 @@ module Data.STM.TList (
     toList,
 ) where
 
-import Prelude hiding (drop, length)
-import qualified Prelude
+import Prelude hiding (drop, length, null)
 
 import Control.Concurrent.STM hiding (check)
 import Control.Monad (foldM)
@@ -114,6 +114,10 @@ uncons onNil onCons tl = do
         TNil       -> onNil
         TCons x xs -> onCons x xs
 {-# INLINE uncons #-}
+
+-- | /O(1)/.  Return 'True' if the list is empty.
+null :: TList a -> STM Bool
+null = uncons (return True) (\_ _ -> return False)
 
 -- | /O(n)/.  Skip the given number of items.  Return the end of the list if a
 -- 'TNil' is reached.
