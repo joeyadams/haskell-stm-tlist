@@ -35,13 +35,17 @@ module Data.STM.TList (
     foldl',
     toList,
 
-    -- * Working with mutable cursors
+    -- * The TCursor type
+    -- $tcursor
     TCursor,
-    newCursorPair,
-    newCursorPairIO,
-    read,
-    tryRead,
-    write,
+    newTCursorPair,
+    newTCursorPairIO,
+    readTCursor,
+    tryReadTCursor,
+    writeTCursor,
+    dupTCursor,
+    unGetTCursor,
+    isEmptyTCursor,
 ) where
 
 import Prelude hiding (drop, length, null, read)
@@ -165,49 +169,87 @@ toList = loop id
                    (loop . (dl .) . (:))
 
 ------------------------------------------------------------------------
--- Working with mutable cursors
+-- The TCursor type
+
+{- $tcursor
+
+This module provides an API very similar to "Control.Concurrent.STM.TChan".
+However, unlike 'TChan':
+
+ * It is based on "Data.STM.TList", rather than using an abstract internal
+   representation.
+
+ * It separates the read end and write end.  This means if the channel has no
+   readers, items written with 'writeTCursor' can be garbage collected.
+
+Here is an implementation of 'TChan' based on 'TCursor':
+
+-}
 
 -- | A 'TCursor' is a mutable cursor used for traversing items.  While 'uncons'
--- and 'append' return the subsequent 'TList', 'read' and 'write' modify the
--- 'TCursor' in-place, and thus behave more like 'readTChan' and 'writeTChan'.
+-- and 'append' return the subsequent 'TList', 'readTCursor' and 'writeTCursor'
+-- modify the cursor in-place, and thus behave more like 'readTChan' and
+-- 'writeTChan'.
 type TCursor a = TVar (TList a)
 
 -- | /O(1)/.  Construct an empty channel, returning the read cursor ('fst') and
 -- write cursor ('snd').
-newCursorPair :: STM (TCursor a, TCursor a)
-newCursorPair = do
+newTCursorPair :: STM (TCursor a, TCursor a)
+newTCursorPair = do
     hole <- empty
     liftM2 (,) (newTVar hole) (newTVar hole)
 
 -- | /O(1)/.  'IO' variant of 'newCursorPair'.  See 'newTVarIO' for the
 -- rationale.
-newCursorPairIO :: IO (TCursor a, TCursor a)
-newCursorPairIO = do
+newTCursorPairIO :: IO (TCursor a, TCursor a)
+newTCursorPairIO = do
     hole <- emptyIO
     liftM2 (,) (newTVarIO hole) (newTVarIO hole)
 
--- | /O(1)/.  Read the next item and advance the cursor.  'retry' if the list
--- is currently empty.
+-- | /O(1)/.  Read the next item and advance the cursor.  'retry' if the
+-- channel is currently empty.
 --
--- This should be called on the read cursor of the channel.
-read :: TCursor a -> STM a
-read cursor =
+-- This should be called on the /read/ cursor of the channel.
+readTCursor :: TCursor a -> STM a
+readTCursor cursor =
     readTVar cursor >>=
         uncons retry
                (\x xs -> do writeTVar cursor xs
                             return x)
 
--- | /O(1)/.  Like 'read', but return 'Nothing', rather than 'retry'ing, if the
--- list is currently empty.
-tryRead :: TCursor a -> STM (Maybe a)
-tryRead cursor =
+-- | /O(1)/.  Like 'readTCursor', but return 'Nothing', rather than 'retry'ing,
+-- if the list is currently empty.
+tryReadTCursor :: TCursor a -> STM (Maybe a)
+tryReadTCursor cursor =
     readTVar cursor >>=
         uncons (return Nothing)
                (\x xs -> do writeTVar cursor xs
                             return (Just x))
 
--- | /O(1)/.  Append an item and advance the cursor.  This should be called on
--- the write cursor of the channel.  See 'append' for more details.
-write :: TCursor a -> a -> STM ()
-write cursor x =
+-- | /O(1)/.  Append an item and advance the cursor.
+--
+-- This should be called on the /write/ cursor of the channel.  See 'append'
+-- for more details.
+writeTCursor :: TCursor a -> a -> STM ()
+writeTCursor cursor x =
     readTVar cursor >>= flip append x >>= writeTVar cursor
+
+-- | /O(1)/.  Make a copy of a 'TCursor'.  Modifying the old cursor with
+-- 'readTCursor' or 'writeTCursor' will not affect the new cursor, and vice
+-- versa.
+dupTCursor :: TCursor a -> STM (TCursor a)
+dupTCursor cursor = readTVar cursor >>= newTVar
+
+-- | /O(1)/.  Put an item back on the channel, where it will be the next item
+-- read by 'readTCursor'.
+--
+-- This should be called on the /read/ cursor of the channel.
+unGetTCursor :: TCursor a -> a -> STM ()
+unGetTCursor cursor x =
+    readTVar cursor >>= cons x >>= writeTVar cursor
+
+-- | /O(1)/.  Return 'True' if the channel is empty.
+--
+-- This should be called on the /read/ cursor of the channel.
+isEmptyTCursor :: TCursor a -> STM Bool
+isEmptyTCursor cursor = readTVar cursor >>= null
