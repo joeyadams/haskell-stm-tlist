@@ -17,6 +17,7 @@ cabal-version:       >=1.8
 
 extra-source-files:
     examples/TChan.hs
+    examples/TChan-with-TCursor.hs
 
 source-repository head
     type:       git
