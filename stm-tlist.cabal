@@ -1,5 +1,5 @@
 name:                stm-tlist
-version:             0.1
+version:             0.1.1
 synopsis:            Mutable, singly-linked list in STM
 description:
     This package provides a mutable, singly-linked list type for use in 'STM'.
