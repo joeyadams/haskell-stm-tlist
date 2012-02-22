@@ -53,19 +53,20 @@ data TCell a = TNil | TCons a (TList a)
 ------------------------------------------------------------------------
 -- Construction
 
--- | Construct a new, empty 'TList'.
+-- | /O(1)/.  Construct a new, empty 'TList'.
 empty :: STM (TList a)
 empty = newTVar TNil
 
--- | 'IO' variant of 'empty'.  See 'newTVarIO' for the rationale.
+-- | /O(1)/.  'IO' variant of 'empty'.  See 'newTVarIO' for the rationale.
 emptyIO :: IO (TList a)
 emptyIO = newTVarIO TNil
 
--- | Prepend an item to the list, returning the new beginning of the list.
+-- | /O(1)/.  Prepend an item to the list, returning the new beginning of the
+-- list.
 cons :: a -> TList a -> STM (TList a)
 cons x xs = newTVar (TCons x xs)
 
--- | Append an item to the list, returning the new write end.
+-- | /O(1)/.  Append an item to the list, returning the new write end.
 --
 -- The 'TList' normally points to a 'TNil', a \"hole\" into which the next item
 -- will be written.  However, if it doesn't, 'append' will silently overwrite
@@ -77,12 +78,12 @@ append hole x = do
     writeTVar hole (TCons x hole')
     return hole'
 
--- | Append a list of items, returning the new write end.
+-- | /O(n)/.  Append a list of items, returning the new write end.
 appendList :: TList a -> [a] -> STM (TList a)
 appendList = foldM append
 
--- | Convert a pure list to a 'TList', returning the head (read end) and tail
--- (write end) of the list.
+-- | /O(n)/.  Convert a pure list to a 'TList', returning the head (read end)
+-- and tail (write end) of the list.
 fromList :: [a] -> STM (TList a, TList a)
 fromList xs = do
     readEnd <- empty
@@ -92,8 +93,8 @@ fromList xs = do
 ------------------------------------------------------------------------
 -- Traversal
 
--- | Get the next item of the list (if available).  Handle 'TNil' (no items
--- available) or 'TCons' (next item) using the appropriate continuation.
+-- | /O(1)/.  Get the next item of the list (if available).  Handle 'TNil' (no
+-- items available) or 'TCons' (next item) using the appropriate continuation.
 uncons :: TList a
        -> STM b
             -- ^ What to do if the list is empty
@@ -114,7 +115,7 @@ drop n xs
     | n <= 0    = return xs
     | otherwise = uncons xs (return xs) (\_ xs' -> drop (n-1) xs')
 
--- | Traverse the list, stopping when a 'TNil' is reached.
+-- | /O(n)/.  Traverse the list, stopping when a 'TNil' is reached.
 --
 -- Bear in mind that 'TList's are mutable.  In particular, the 'end' of a
 -- 'TList' is not as boring as the end of a pure list (@[]@, a.k.a.
@@ -123,13 +124,13 @@ drop n xs
 end :: TList a -> STM (TList a)
 end xs = uncons xs (return xs) (\_ xs' -> end xs')
 
--- | Traverse the list, returning its length.
+-- | /O(n)/.  Traverse the list, returning its length.
 length :: TList a -> STM Int
 length list = len list 0
     where
         len xs !n = uncons xs (return n) (\_ xs' -> len xs' (n+1))
 
--- | Traverse the list with an accumulator function and initial value.
+-- | /O(n)/.  Traverse the list with an accumulator function and initial value.
 foldl' :: (a -> b -> a) -> a -> TList b -> STM a
 foldl' f a xs =
     uncons xs
@@ -137,7 +138,7 @@ foldl' f a xs =
            (\x xs' -> let !a' = f a x
                        in foldl' f a' xs')
 
--- | Traverse a 'TList', returning its items as a pure list.
+-- | /O(n)/.  Traverse a 'TList', returning its items as a pure list.
 toList :: TList a -> STM [a]
 toList list = loop id list
     where
