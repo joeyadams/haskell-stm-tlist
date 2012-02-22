@@ -39,8 +39,7 @@ import Prelude hiding (drop, length)
 import qualified Prelude
 
 import Control.Concurrent.STM hiding (check)
-import Control.Exception (Exception)
-import Control.Monad (foldM, join)
+import Control.Monad (foldM)
 import Data.Typeable (Typeable)
 
 ------------------------------------------------------------------------
