@@ -11,7 +11,7 @@ module TChan (
 ) where
 
 import Control.Concurrent.STM (STM)
-import Data.STM.TList
+import Data.STM.TCursor
 
 type TChan a = (TCursor a, TCursor a)
 
