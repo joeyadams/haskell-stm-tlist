@@ -45,8 +45,12 @@ import Data.Typeable (Typeable)
 ------------------------------------------------------------------------
 -- The TList type
 
+-- | A 'TList' is a mutable linked list node.  A 'TList' node containing 'TNil'
+-- is usually called a \"hole\" or \"write end\", and can be \"filled\" using
+-- 'append'.
 type TList a = TVar (TCell a)
-data TCell a = TNil | TCons a (TList a)
+
+data TCell a = TNil | TCons a !(TList a)
     deriving Typeable
 
 ------------------------------------------------------------------------
