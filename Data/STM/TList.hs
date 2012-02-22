@@ -184,6 +184,24 @@ However, unlike 'TChan':
 
 Here is an implementation of 'TChan' based on 'TCursor':
 
+>type TChan a = (TCursor a, TCursor a)
+>
+>newTChan = newTCursorPair
+>
+>newTChanIO = newTCursorPairIO
+>
+>readTChan = readTCursor . fst
+>
+>writeTChan = writeTCursor . snd
+>
+>dupTChan (_, writeEnd) = do
+>    newReadEnd <- dupTCursor writeEnd
+>    return (newReadEnd, writeEnd)
+>
+>unGetTChan = unGetTCursor . fst
+>
+>isEmptyTChan = isEmptyTCursor . fst
+
 -}
 
 -- | A 'TCursor' is a mutable cursor used for traversing items.  While 'uncons'
