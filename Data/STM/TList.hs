@@ -137,7 +137,7 @@ end xs = uncons (return xs) (\_ xs' -> end xs') xs
 
 -- | /O(n)/.  Traverse the list, returning its length.
 length :: TList a -> STM Int
-length list = len 0 list
+length = len 0
     where
         len !n = uncons (return n) (\_ -> len (n+1))
 
