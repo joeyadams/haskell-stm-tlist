@@ -98,13 +98,17 @@ fromList xs = do
 
 -- | /O(1)/.  Get the next item of the list (if available).  Handle 'TNil' (no
 -- items available) or 'TCons' (next item) using the appropriate continuation.
-uncons :: TList a
-       -> STM b
+--
+-- The 'TList' argument being at the end means 'uncons' can be partially
+-- applied in many situations.
+uncons :: STM b
             -- ^ What to do if the list is empty
        -> (a -> TList a -> STM b)
             -- ^ What to do with the item and the remainder of the list
+       -> TList a
+            -- ^ List node to examine
        -> STM b
-uncons tl onNil onCons = do
+uncons onNil onCons tl = do
     cell <- readTVar tl
     case cell of
         TNil       -> onNil
@@ -116,7 +120,7 @@ uncons tl onNil onCons = do
 drop :: Int -> TList a -> STM (TList a)
 drop n xs
     | n <= 0    = return xs
-    | otherwise = uncons xs (return xs) (\_ xs' -> drop (n-1) xs')
+    | otherwise = uncons (return xs) (\_ xs' -> drop (n-1) xs') xs
 
 -- | /O(n)/.  Traverse the list, stopping when a 'TNil' is reached.
 --
@@ -125,27 +129,25 @@ drop n xs
 -- \"nil\").  It is usually the write end, to which additional items may be
 -- 'append'ed.
 end :: TList a -> STM (TList a)
-end xs = uncons xs (return xs) (\_ xs' -> end xs')
+end xs = uncons (return xs) (\_ xs' -> end xs') xs
 
 -- | /O(n)/.  Traverse the list, returning its length.
 length :: TList a -> STM Int
-length list = len list 0
+length list = len 0 list
     where
-        len xs !n = uncons xs (return n) (\_ xs' -> len xs' (n+1))
+        len !n = uncons (return n) (\_ -> len (n+1))
 
 -- | /O(n)/.  Traverse the list with an accumulator function and initial value.
 foldl' :: (a -> b -> a) -> a -> TList b -> STM a
-foldl' f a xs =
-    uncons xs
-           (return a)
-           (\x xs' -> let !a' = f a x
-                       in foldl' f a' xs')
+foldl' f a =
+    uncons (return a)
+           (\x -> let !a' = f a x
+                   in foldl' f a')
 
 -- | /O(n)/.  Traverse a 'TList', returning its items as a pure list.
 toList :: TList a -> STM [a]
-toList list = loop id list
+toList = loop id
     where
-        loop !dl xs =
-            uncons xs
-                   (return $ dl [])
-                   (\x xs' -> loop (dl . (x:)) xs')
+        loop !dl =
+            uncons (return $ dl [])
+                   (loop . (dl .) . (:))
