@@ -55,7 +55,7 @@ import Prelude hiding (null)
 
 import Data.STM.TList
 
-import Control.Concurrent.STM hiding (check)
+import Control.Concurrent.STM
 import Control.Monad (liftM2)
 
 -- | A 'TCursor' is a mutable cursor used for traversing items.  While 'uncons'

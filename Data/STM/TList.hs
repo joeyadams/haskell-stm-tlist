@@ -38,7 +38,7 @@ module Data.STM.TList (
 
 import Prelude hiding (drop, length, null)
 
-import Control.Concurrent.STM hiding (check)
+import Control.Concurrent.STM
 import Control.Monad (foldM)
 import Data.Typeable (Typeable)
 
