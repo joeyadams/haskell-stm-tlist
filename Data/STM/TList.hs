@@ -18,15 +18,31 @@ import qualified Prelude
 
 import Control.Concurrent.STM hiding (check)
 import Control.Exception (Exception)
-import Control.Monad (join)
+import Control.Monad (foldM, join)
 import Data.Typeable (Typeable)
 
 type TList a = TVar (TCell a)
 data TCell a = TNil | TCons a (TList a)
     deriving Typeable
 
--- | Get the next item of the list (if available), and handle it with the given
--- continuation.
+-- | Append an item to the list, returning the new write end.
+--
+-- The 'TList' normally points to a 'TNil', a \"hole\" into which the next item
+-- will be written.  However, if it doesn't, 'append' will silently overwrite
+-- the next item.  It is up to the application to ensure that the 'TList'
+-- points to a 'TNil', or that overwriting an item in this case is desirable.
+append :: TList a -> a -> STM (TList a)
+append hole x = do
+    hole' <- newTVar TNil
+    writeTVar hole (TCons x hole')
+    return hole'
+
+-- | Append a list of items, returning the new write end.
+appendList :: TList a -> [a] -> STM (TList a)
+appendList = foldM append
+
+-- | Get the next item of the list (if available).  Handle 'TNil' (no items
+-- available) or 'TCons' (next item) using the appropriate continuation.
 uncons :: TList a
        -> STM b
             -- ^ What to do if the list is empty
@@ -73,3 +89,11 @@ toList list = loop id list
             uncons xs
                    (return $ dl [])
                    (\x xs' -> loop (dl . (x:)) xs')
+
+-- | Convert a pure list to a 'TList', returning the head (read end) and tail
+-- (write end) of the list.
+fromList :: [a] -> STM (TList a, TList a)
+fromList xs = do
+    readEnd <- newTVar TNil
+    writeEnd <- appendList readEnd xs
+    return (readEnd, writeEnd)
